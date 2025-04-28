@@ -1,20 +1,45 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+// App.js
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { AuthProvider, AuthContext } from './src/context/AuthContext';
+import LoginScreen from './src/views/screens/LoginScreen';
+import RegistrationScreen from './src/views/screens/RegistrationScreen';
+import MainAppScreen from './src/views/screens/MainAppScreen';
 
-export default function App() {
+const Stack = createNativeStackNavigator();
+
+const AppNavigator = () => {
+  const { isLoading, userToken } = React.useContext(AuthContext);
+
+  if (isLoading) {
+    return null; // O un componente de carga
+  }
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {userToken ? (
+          // Pantallas para usuarios autenticados
+          <Stack.Screen name="MainAppScreen" component={MainAppScreen} />
+        ) : (
+          // Pantallas para usuarios no autenticados
+          <>
+            <Stack.Screen name="LoginScreen" component={LoginScreen} />
+            <Stack.Screen name="RegistrationScreen" component={RegistrationScreen} />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+const App = () => {
+  return (
+    <AuthProvider>
+      <AppNavigator />
+    </AuthProvider>
+  );
+};
+
+export default App;
