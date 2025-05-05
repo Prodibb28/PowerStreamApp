@@ -13,17 +13,15 @@ const AppNavigator = () => {
   const { isLoading, userToken } = React.useContext(AuthContext);
 
   if (isLoading) {
-    return null; // O un componente de carga
+    return null;
   }
 
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {userToken ? (
-          // Pantallas para usuarios autenticados
-          <Stack.Screen name="MainAppScreen" component={MainAppScreen} />
+          <Stack.Screen name="MainApp" component={MainAppScreen} />
         ) : (
-          // Pantallas para usuarios no autenticados
           <>
             <Stack.Screen name="LoginScreen" component={LoginScreen} />
             <Stack.Screen name="RegistrationScreen" component={RegistrationScreen} />

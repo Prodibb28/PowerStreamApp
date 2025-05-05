@@ -37,13 +37,13 @@ const Input = ({label, iconName, error, password, onFocus = ()=>{}, ...props}) =
             onBlur={() => {
                 setIsFocused(false)
             }}
-            style={{color:COLORS.black, flex:1, fontFamily:"Onest" }}
+            style={{color:COLORS.black, flex:1, fontFamily:"OnestSemiBold" }}
             placeholderTextColor={COLORS.grey}
             {...props}
         />
         </View>
         {error && (
-        <Text style = {{color: COLORS.red, fontSize:12,}}>{error}</Text>
+        <Text style = {{color: COLORS.red, fontSize:12, fontFamily:'OnestSemiBold'}}>{error}</Text>
         )}
     </View>
     );
@@ -53,7 +53,7 @@ const style = StyleSheet.create({
     label:{
         marginVertical: 2,
         fontSize: 14,
-        fontFamily:"Onest",
+        fontFamily:"OnestBold",
         color: COLORS.blue
     },
     inputContainer:{

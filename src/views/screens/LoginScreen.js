@@ -120,7 +120,7 @@ const LoginScreen = ({ navigation }) => {
                             fontSize: 12,
                             fontFamily: 'Onest',
                             fontWeight: '500', 
-                            marginVertical: 30
+                            marginVertical: 140
                     }}>
                         By Jaider Hoyos
                     </Text>

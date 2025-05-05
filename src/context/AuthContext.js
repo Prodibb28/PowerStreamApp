@@ -48,13 +48,21 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(false);
     }
   };
+  const updateUser = async (newUserData) => {
+    try {
+      await AsyncStorage.setItem('userData', JSON.stringify(newUserData));
+      setUserData(newUserData);
+    } catch (e) {
+      console.log('Error updating user data', e);
+    }
+  };
 
   useEffect(() => {
     isLoggedIn();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ login, logout, isLoading, userToken, userData }}>
+    <AuthContext.Provider value={{ login, logout, isLoading, userToken, userData,  updateUser}}>
       {children}
     </AuthContext.Provider>
   );
