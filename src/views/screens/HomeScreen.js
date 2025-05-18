@@ -6,16 +6,25 @@ import Card from '../components/Card';
 import Input from '../components/Input';
 import COLORS from '../../conts/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+// Importa el componente necesario
+import { BarChart } from 'react-native-chart-kit';
+import { Dimensions } from 'react-native';
+
 import { useFonts } from 'expo-font';
 import Loader from '../components/Loader';
 
 const HomeScreen = ({ navigation }) => {
   const { logout, userData } = useContext(AuthContext);
+  const { setElectricalData } = useContext(AuthContext);
   const [loaded] = useFonts({
     'OnestSemiBold': require('../../../assets/fonts/OnestSemiBold.ttf'),
     'OnestBlack': require('../../../assets/fonts/OnestBlack.ttf'),
     'OnestBold': require('../../../assets/fonts/OnestBlack.ttf'),
   });
+ const [dateIndex, setDateIndex] = useState(0); // índice para el slice en sortedDates
+const [sortedDates, setSortedDates] = useState([]); // guardaremos todas las fechas ordenadas para control
+const [dailyConsumption, setDailyConsumption] = useState({}); // para tener acceso a datos completos
+
   
   // Estados para el consumo
   const [totalConsumption, setTotalConsumption] = useState(0);
@@ -59,51 +68,112 @@ const HomeScreen = ({ navigation }) => {
   ? (totalConsumption / currentPlan.meta_mensual_kwh) * 100 
   : 0;
 
-  // Obtener datos de consumo y planificación
-  const fetchData = async () => {
-    try {
-      setIsLoading(true);
-      
-      // 1. Obtener consumo energético
-      const consumptionResponse = await fetch('http://52.67.106.144/api/mediciones/');
-      if (!consumptionResponse.ok) throw new Error(`Error al obtener consumo: ${consumptionResponse.status}`);
-      
-      const consumptionData = await consumptionResponse.json();
-      const allConsumption = consumptionData.reduce((sum, item) => sum + (item.consumo_energetico || 0), 0);
-      setTotalConsumption(allConsumption);
-      
-      // 2. Obtener la última planificación del usuario
-      const latestPlan = await fetchLatestUserPlan(userData.nic);
-      
-      if (latestPlan) {
-        setCurrentPlan(latestPlan);
-        setEstimatedCost(latestPlan.meta_mensual_kwh * latestPlan.tarifa_kwh);
-        setInputs({
-          rate: latestPlan.tarifa_kwh.toString(),
-          monthly_kwh: latestPlan.meta_mensual_kwh.toString()
-        });
-      } else {
-        setCurrentPlan(null);
-        setEstimatedCost(0);
-        setInputs({
-          rate: '',
-          monthly_kwh: ''
-        });
-      }
-      
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError(err.message);
-      setTotalConsumption(0);
-      setEstimatedCost(0);
-      setCurrentPlan(null);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const [chartData, setChartData] = useState([]);
 
+const fetchData = async () => {
+  try {
+    setIsLoading(true);
+
+    const consumptionResponse = await fetch('http://52.67.106.144/api/mediciones/');
+    if (!consumptionResponse.ok) throw new Error(`Error al obtener consumo: ${consumptionResponse.status}`);
+
+    const consumptionData = await consumptionResponse.json();
+
+    const dailyData = {};
+    const latestMeasurement = consumptionData[consumptionData.length - 1]; // o usar sort por fecha si necesario
+
+if (latestMeasurement) {
+  setElectricalData({
+    voltaje: latestMeasurement.voltaje || 0,
+    corriente: latestMeasurement.corriente || 0,
+    potenciaActiva: latestMeasurement.potencia_activa || 0,
+    consumo: latestMeasurement.consumo_energetico || 0,
+    factorDePotencia: latestMeasurement.factor_de_potencia || 0
+  });
+}
+    consumptionData.forEach(item => {
+      const date = new Date(item.fecha).toISOString().split('T')[0];
+      if (!dailyData[date]) dailyData[date] = 0;
+      dailyData[date] += item.consumo_energetico || 0;
+    });
+
+    const dates = Object.keys(dailyData).sort((a, b) => new Date(b) - new Date(a)); // más recientes primero
+    setSortedDates(dates);
+    setDailyConsumption(dailyData);
+
+    setDateIndex(0);
+
+    updateChartData(dates, dailyData, 0);
+
+    const sortedDates = Object.keys(dailyConsumption).sort((a, b) => new Date(b) - new Date(a));
+    const latest7 = sortedDates.slice(0, 6).reverse(); // Últimos 7, en orden cronológico
+
+    const labels = latest7.map(date => date.slice(5)); // mm-dd
+    const values = latest7.map(date => parseFloat(dailyConsumption[date].toFixed(2)));
+
+    setChartData({ labels, datasets: [{ data: values }] });
+     console.log(sortedDates)
+
+    // Total
+    const allConsumption = Object.values(dailyConsumption).reduce((sum, value) => sum + value, 0);
+    setTotalConsumption(allConsumption);
+
+    const latestPlan = await fetchLatestUserPlan(userData.nic);
+    if (latestPlan) {
+      setCurrentPlan(latestPlan);
+      setEstimatedCost(latestPlan.meta_mensual_kwh * latestPlan.tarifa_kwh);
+      setInputs({
+        rate: latestPlan.tarifa_kwh.toString(),
+        monthly_kwh: latestPlan.meta_mensual_kwh.toString()
+      });
+    } else {
+      setCurrentPlan(null);
+      setEstimatedCost(0);
+      setInputs({ rate: '', monthly_kwh: '' });
+    }
+
+    setError(null);
+  } catch (err) {
+    console.error('Error fetching data:', err);
+    setError(err.message);
+  } finally {
+    setIsLoading(false);
+    setRefreshing(false);
+  }
+};
+const handlePrevious = () => {
+  // Ir 6 días más atrás: aumenta index, pero no más allá del final del array
+  if (dateIndex + 6 < sortedDates.length) {
+    const newIndex = dateIndex + 6;
+    setDateIndex(newIndex);
+    updateChartData(sortedDates, dailyConsumption, newIndex);
+  }
+};
+
+const handleNext = () => {
+  // Ir 6 días hacia adelante (más recientes), mínimo 0
+  if (dateIndex - 6 >= 0) {
+    const newIndex = dateIndex - 6;
+    setDateIndex(newIndex);
+    updateChartData(sortedDates, dailyConsumption, newIndex);
+  } else if (dateIndex > 0) {
+    setDateIndex(0);
+    updateChartData(sortedDates, dailyConsumption, 0);
+  }
+};
+
+
+const updateChartData = (dates, dailyData, index) => {
+  // Coger 6 días a partir del índice (ordenados cronológicamente)
+  const sliceDates = dates.slice(index, index + 6).reverse(); // invertir para que queden del más antiguo al más reciente
+
+  const labels = sliceDates.map(date => date.slice(5)); // mm-dd
+  const values = sliceDates.map(date => parseFloat(dailyData[date].toFixed(2)));
+
+  setChartData({ labels, datasets: [{ data: values }] });
+};
+
+  
   useEffect(() => {
     fetchData();
   }, []);
@@ -142,6 +212,7 @@ const HomeScreen = ({ navigation }) => {
   const saveEnergyPlan = async () => {
     try {
       setSavingPlan(true);
+      
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
       const currentMonth = currentDate.getMonth() + 1;
@@ -351,9 +422,72 @@ const HomeScreen = ({ navigation }) => {
             </>
           )}
         </View>
-      </ScrollView>
+        
+        <Text style={{paddingHorizontal:18, paddingTop:20, paddingBottom:15,fontSize:15, fontFamily:'OnestBold', color:COLORS.blue}}>
+            Consumo energético mes actual (kWh)
+          </Text>
+          <View style={styles.chartContainer}>
+  {chartData?.labels?.length > 0 ? (
+    <BarChart
+      data={chartData}
+      width={Dimensions.get('window').width - 40}
+      height={220}
+      fromZero
+      showValuesOnTopOfBars
+      withInnerLines={false}
+      flatColor={true}
+        chartConfig={{
+    backgroundColor: '#ffffff',
+    backgroundGradientFrom: '#ffffff',
+    backgroundGradientTo: '#ffffff',
+    decimalPlaces: 2,
+    color: () => '#007AFF',
+    labelColor: () => '#000000',
+    style: {
+      borderRadius: 16,
+    },
+    propsForBackgroundLines: {
+      stroke: '#e3e3e3',
+      strokeDasharray: '', // Líneas sólidas
+    },
+    barPercentage: 0.9, // Controla el ancho de las barras
+  }}
+      
+      style={{
+        borderRadius: 16,
+        marginVertical: 10,
+      }}
+    />
+  ) : (
+    <Text style={{ textAlign: 'center', marginVertical: 10 }}>No hay datos suficientes para mostrar el gráfico.</Text>
+  )}
+</View>
 
-      {/* Modal para planificación */}
+ <View style={{
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 35,
+    paddingVertical: 0,
+  }}>
+      <Button
+        title={"Anterior"}
+        onPress={handlePrevious}
+        width={'48%'}
+        style={{ backgroundColor: COLORS.blue }}
+        textStyle={{ color: COLORS.white }}
+      />
+      <Button
+        title={"Siguiente"}
+        width={'48%'}
+        onPress={handleNext}
+        style={{ backgroundColor: COLORS.blue }}
+        textStyle={{ color: COLORS.white }}
+      />
+    </View>
+      </ScrollView>
+      
+
+     
       <Modal
         visible={showPlanModal}
         animationType="slide"
@@ -385,8 +519,13 @@ const HomeScreen = ({ navigation }) => {
               onChangeText={(text) => handleOnChange(text, 'monthly_kwh')}
               onFocus={() => handleError(null, 'monthly_kwh')}
             />
-
-            <View style={styles.modalButtons}>
+            <Text style={{paddingVertical:5, fontFamily:'OnestSemiBold'}}>
+                  Costo mensual estimado: {' '}
+                  {inputs.rate && inputs.monthly_kwh
+                    ? (parseFloat(inputs.rate) * parseFloat(inputs.monthly_kwh)).toFixed(2) + ' COP'
+                    : 'N/A'}
+                </Text>
+           <View style={styles.modalButtons}>
               <Button
                 title="Cancelar"
                 onPress={() => !savingPlan && setShowPlanModal(false)}
@@ -395,6 +534,7 @@ const HomeScreen = ({ navigation }) => {
                 style={{backgroundColor: COLORS.grey, flex: 1, marginRight: 10}}
                 textStyle={{color: COLORS.dark}}
               />
+              
               <Button
                 title={savingPlan ? "Guardando..." : "Guardar"}
                 onPress={validatePlan}
@@ -403,16 +543,17 @@ const HomeScreen = ({ navigation }) => {
                 style={{backgroundColor: COLORS.blue, flex: 1}}
                 textStyle={{color: COLORS.white}}
               />
-            </View>
+               </View>
           </View>
         </View>
         <Loader visible={savingPlan}/>
+        
       </Modal>
+
     </SafeAreaView>
   );
 };
 
-// Estilos permanecen igual...
 
 const styles = StyleSheet.create({
   headerApp: {
@@ -420,6 +561,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     justifyContent: 'space-between',
     alignItems: 'center'
+  },
+  chartContainer: {
+    marginHorizontal: 0,
+    marginTop: 10,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 10,
   },
   loadingContainer: {
     flex: 1,

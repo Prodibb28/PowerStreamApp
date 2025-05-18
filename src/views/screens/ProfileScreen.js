@@ -18,12 +18,16 @@ import Loader from '../components/Loader';
 const ProfileScreen = () => {
   const { userData, updateUser } = useContext(AuthContext);
   const [inputs, setInputs] = useState({
-    name: '',
-    phone: '',
-    address: '',
-    nic: '',
-    socialstratum: ''
-  });
+  name: '',
+  phone: '',
+  address: '',
+  nic: '',
+  socialstratum: '',
+  deviceName: '',
+  wifiName: '',
+  wifiPassword: '',
+});
+
   
   const [initialData, setInitialData] = useState({});
   const [errors, setErrors] = useState({});
@@ -34,12 +38,16 @@ const ProfileScreen = () => {
   useEffect(() => {
     if (userData) {
       const initialValues = {
-        name: userData.nombre || '',
-        phone: userData.telefono || '',
-        address: userData.direccion || '',
-        nic: userData.nic || '',
-        socialstratum: userData.estrato?.toString() || ''
-      };
+  name: userData.nombre || '',
+  phone: userData.telefono || '',
+  address: userData.direccion || '',
+  nic: userData.nic || '',
+  socialstratum: userData.estrato?.toString() || '',
+  deviceName: '',  // Agrega valores predeterminados si no vienen del servidor
+  wifiName: '',
+  wifiPassword: '',
+};
+
       setInputs(initialValues);
       setInitialData(initialValues);
     }
@@ -82,6 +90,19 @@ const ProfileScreen = () => {
       handleError("Por favor ingresa el estrato de tu casa", 'socialstratum');
       isValid = false;
     }
+    if (!inputs.deviceName) {
+  handleError("Por favor ingresa el nombre del dispositivo", 'deviceName');
+  isValid = false;
+}
+if (!inputs.wifiName) {
+  handleError("Por favor ingresa el nombre de la red WiFi", 'wifiName');
+  isValid = false;
+}
+if (!inputs.wifiPassword) {
+  handleError("Por favor ingresa la contraseña de la red WiFi", 'wifiPassword');
+  isValid = false;
+}
+
 
     if (isValid) {
       if (!hasChanges) {
@@ -100,12 +121,16 @@ const ProfileScreen = () => {
     setLoading(true);
     
     const updatedData = {
-      nic: inputs.nic,
-      nombre: inputs.name,
-      direccion: inputs.address,
-      estrato: parseInt(inputs.socialstratum),
-      telefono: inputs.phone,
-    };
+  nic: inputs.nic,
+  nombre: inputs.name,
+  direccion: inputs.address,
+  estrato: parseInt(inputs.socialstratum),
+  telefono: inputs.phone,
+  dispositivo: inputs.deviceName,
+  wifi_nombre: inputs.wifiName,
+  wifi_clave: inputs.wifiPassword,
+};
+
 
     try {
       const response = await fetch(`http://52.67.106.144/api/usuarios/${userData.nic}/`, {
@@ -188,9 +213,10 @@ const ProfileScreen = () => {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Datos Personales</Text>
         <Text style={styles.subtitle}>
-          Aquí puedes ver y actualizar tu información personal. 
-          Recuerda guardar los cambios si modificas algún dato.
-        </Text>
+  Aquí puedes ver y actualizar tu información personal
+  Recuerda guardar los cambios si modificas algún dato.
+  Desliza hacia abajo para ver todos los campos disponibles.
+</Text>
         <Input 
           placeholder="Nombre completo"
           label="Nombres y Apellidos"
@@ -244,6 +270,37 @@ const ProfileScreen = () => {
           onChangeText={(text) => handleOnChange(text, 'socialstratum')}
           onFocus={() => handleError(null, 'socialstratum')}
         />
+        <Input 
+  placeholder="Nombre del dispositivo"
+  label="Dispositivo"
+  iconName="devices"
+  value={inputs.deviceName}
+  error={errors.deviceName}
+  onChangeText={(text) => handleOnChange(text, 'deviceName')}
+  onFocus={() => handleError(null, 'deviceName')}
+/>
+
+<Input 
+  placeholder="Nombre de la red WiFi"
+  label="WiFi"
+  iconName="wifi"
+  value={inputs.wifiName}
+  error={errors.wifiName}
+  onChangeText={(text) => handleOnChange(text, 'wifiName')}
+  onFocus={() => handleError(null, 'wifiName')}
+/>
+
+<Input 
+  placeholder="Contraseña de la red WiFi"
+  label="Contraseña WiFi"
+  iconName="form-textbox-password"
+  secureTextEntry={true}
+  value={inputs.wifiPassword}
+  error={errors.wifiPassword}
+  onChangeText={(text) => handleOnChange(text, 'wifiPassword')}
+  onFocus={() => handleError(null, 'wifiPassword')}
+/>
+
         <Button 
           title="Actualizar datos" 
           onPress={validate}
